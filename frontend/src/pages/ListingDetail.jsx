@@ -18,12 +18,13 @@ export default function ListingDetail() {
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState(null);
   const [creditAmount, setCreditAmount] = useState('');
+  const [offerMessage, setOfferMessage] = useState('');
 
   useEffect(() => {
     Promise.all([
       api.get(`/listings/${id}`).then(r => {
         setListing(r.data);
-        setCreditAmount(String(r.data.estimatedHours));
+        setCreditAmount(String(r.data.estimatedHours * 100));
       }),
       api.get(`/listings/user/${user.id}`)
         .then(r => setMyListings(r.data.filter(l => l.status === 'active' && l.type === 'offer')))
@@ -63,26 +64,23 @@ export default function ListingDetail() {
     }
   };
 
-  const handlePayCredits = async () => {
+  const handleProposeOffer = async () => {
     const amt = parseInt(creditAmount);
     if (!amt || amt < 1) return toast.error('Enter a valid amount');
-    if (user.timeCredits < amt) return toast.error(`Insufficient credits. You have ${user.timeCredits}.`);
     setPaying(true);
     try {
-      const { data } = await api.post('/auth/credits/pay', {
-        toUserId: listing.userId,
-        toUserName: listing.userName,
-        amount: amt,
+      await api.post('/credit-offers', {
+        listingId: listing._id,
         listingTitle: listing.title,
+        sellerId: listing.userId,
+        sellerName: listing.userName,
+        proposedAmount: amt,
+        message: offerMessage,
       });
-      const stored = JSON.parse(localStorage.getItem('user') || '{}');
-      const updated = { ...stored, timeCredits: data.user.timeCredits };
-      localStorage.setItem('user', JSON.stringify(updated));
-      setUser(updated);
-      toast.success(data.message);
+      toast.success('Offer sent! Waiting for seller to respond.');
       navigate('/credits');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Payment failed');
+      toast.error(err.response?.data?.message || 'Failed to send offer');
     } finally {
       setPaying(false);
     }
@@ -180,30 +178,35 @@ export default function ListingDetail() {
             {mode === 'pay' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between mb-1">
-                  <h3 className="font-semibold text-dark">Pay with credits</h3>
+                  <h3 className="font-semibold text-dark">Propose a credit offer</h3>
                   <button type="button" onClick={() => setMode(null)} className="text-sm text-gray-400 hover:text-gray-600">← Back</button>
                 </div>
                 <div className="bg-primary-50 rounded-lg p-4 text-sm text-primary-800">
-                  <p>Suggested: <strong>{listing.estimatedHours} credits</strong> for {listing.estimatedHours}h of work</p>
-                  <p className="text-primary-600 mt-0.5">You have <strong>{user.timeCredits} credits</strong> (₹{user.timeCredits})</p>
+                  <p>Suggested: <strong>{listing.estimatedHours * 100} credits</strong> for {listing.estimatedHours}h of work</p>
+                  <p className="text-primary-600 mt-0.5">You have <strong>{user.timeCredits} credits</strong> · Credits are held only after deal is locked</p>
                 </div>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium text-sm">₹</span>
                   <input
                     type="number"
                     className="input pl-7"
-                    placeholder="Enter credits to pay"
+                    placeholder="Your offer in credits"
                     min="1"
-                    max={user.timeCredits}
                     value={creditAmount}
                     onChange={e => setCreditAmount(e.target.value)}
                   />
                 </div>
-                <button onClick={handlePayCredits} disabled={paying || !creditAmount} className="btn-primary w-full py-3 flex items-center justify-center gap-2 disabled:opacity-60">
+                <textarea
+                  className="input resize-none h-20"
+                  placeholder="Add a note to the seller (optional)"
+                  value={offerMessage}
+                  onChange={e => setOfferMessage(e.target.value)}
+                />
+                <button onClick={handleProposeOffer} disabled={paying || !creditAmount} className="btn-primary w-full py-3 flex items-center justify-center gap-2 disabled:opacity-60">
                   <IndianRupee size={18} />
-                  {paying ? 'Processing...' : `Pay ₹${creditAmount || 0} to ${listing.userName}`}
+                  {paying ? 'Sending...' : `Offer ${creditAmount || 0} credits to ${listing.userName}`}
                 </button>
-                <p className="text-xs text-gray-400 text-center">Credits transfer instantly. No swap needed.</p>
+                <p className="text-xs text-gray-400 text-center">Seller can accept or counter. Credits transfer only when deal is locked.</p>
               </div>
             )}
           </div>

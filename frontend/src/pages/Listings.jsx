@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import ListingCard from '../components/ListingCard';
 import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import { Search, SlidersHorizontal } from 'lucide-react';
 
 const CATEGORIES = ['Technology', 'Education', 'Home Services', 'Transportation', 'Arts & Creative', 'Food & Cooking', 'Health & Wellness', 'Other'];
 
 export default function Listings() {
+  const { user } = useAuth();
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -82,7 +84,7 @@ export default function Listings() {
         </div>
       ) : (
         <div className="grid md:grid-cols-3 gap-4">
-          {listings.map(l => <ListingCard key={l._id} listing={l} />)}
+          {listings.filter(l => !(l.userId === user.id && l.type === 'request')).map(l => <ListingCard key={l._id} listing={l} />)}
         </div>
       )}
     </div>

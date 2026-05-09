@@ -4,7 +4,21 @@ import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 import ListingCard from '../components/ListingCard';
-import { Star, MapPin, ArrowLeftRight, Edit2, Check, X, Wallet, TrendingUp, TrendingDown, IndianRupee, BarChart2 } from 'lucide-react';
+import { Star, MapPin, ArrowLeftRight, Edit2, Check, X, Wallet, TrendingUp, TrendingDown, IndianRupee, BarChart2, MessageSquare } from 'lucide-react';
+
+function StarRow({ filled }) {
+  return (
+    <div className="flex gap-0.5">
+      {[1, 2, 3, 4, 5].map(i => (
+        <Star
+          key={i}
+          size={14}
+          className={i <= filled ? 'text-primary-500 fill-primary-500' : 'text-gray-200 fill-gray-200'}
+        />
+      ))}
+    </div>
+  );
+}
 
 export default function Profile() {
   const { userId } = useParams();
@@ -15,6 +29,7 @@ export default function Profile() {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ bio: '', location: '', skills: '' });
   const [stats, setStats] = useState(null);
+  const [reviews, setReviews] = useState([]);
 
   const isOwn = user.id === userId;
 
@@ -30,12 +45,16 @@ export default function Profile() {
       .then(r => setListings(r.data.filter(l => l.status === 'active')))
       .catch(() => setListings([]));
 
-    const fetchStats = api.get(`/auth/credits/stats/${userId}`)
-      .then(r => setStats(r.data))
+    const fetchStats = isOwn
+      ? api.get(`/auth/credits/stats/${userId}`).then(r => setStats(r.data)).catch(() => {})
+      : Promise.resolve();
+
+    const fetchReviews = api.get(`/swaps/ratings/${userId}`)
+      .then(r => setReviews(r.data))
       .catch(() => {});
 
-    Promise.all([fetchProfile, fetchListings, fetchStats]).finally(() => setLoading(false));
-  }, [userId]);
+    Promise.all([fetchProfile, fetchListings, fetchStats, fetchReviews]).finally(() => setLoading(false));
+  }, [userId, isOwn]);
 
   const saveProfile = async () => {
     try {
@@ -135,7 +154,7 @@ export default function Profile() {
         </div>
       </div>
 
-      <div className="mb-6">
+      {isOwn && <div className="mb-6">
         <h2 className="font-bold text-lg text-dark mb-3 flex items-center gap-2">
           <BarChart2 size={18} className="text-primary-500" />
           Activity Stats
@@ -207,6 +226,88 @@ export default function Profile() {
             <p className="text-xs text-gray-400 mt-0.5">completed</p>
           </div>
         </div>
+      </div>}
+
+      <div className="mb-6">
+        <h2 className="font-bold text-lg text-dark mb-3 flex items-center gap-2">
+          <MessageSquare size={18} className="text-primary-500" />
+          Ratings &amp; Feedback
+        </h2>
+        {!profile?.ratingCount ? (
+          <div className="card p-6 text-center text-gray-400 text-sm">
+            <Star size={32} className="mx-auto mb-2 opacity-20" />
+            <p>No ratings yet. Ratings appear after completed swaps.</p>
+          </div>
+        ) : (
+          <div className="card p-6">
+            <div className="flex items-center gap-8">
+              <div className="text-center shrink-0">
+                <p className="text-5xl font-black text-dark leading-none">{profile.rating.toFixed(1)}</p>
+                <StarRow filled={Math.round(profile.rating)} />
+                <p className="text-xs text-gray-400 mt-1">{profile.ratingCount} {profile.ratingCount === 1 ? 'review' : 'reviews'}</p>
+              </div>
+              <div className="flex-1 space-y-2">
+                {(() => {
+                  const bd = profile.ratingBreakdown || {};
+                  const bdSum = [1,2,3,4,5].reduce((a, s) => a + (bd[s] ?? 0), 0);
+                  const effective = bdSum === 0 && profile.ratingCount > 0
+                    ? { [Math.round(profile.rating)]: profile.ratingCount }
+                    : bd;
+                  return [5, 4, 3, 2, 1].map(star => {
+                    const count = effective[star] ?? 0;
+                    const pct = profile.ratingCount > 0 ? Math.round((count / profile.ratingCount) * 100) : 0;
+                    return (
+                      <div key={star} className="flex items-center gap-2">
+                        <span className="text-xs text-gray-500 w-3">{star}</span>
+                        <Star size={11} className="text-primary-400 fill-primary-400 shrink-0" />
+                        <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-primary-400 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="text-xs text-gray-400 w-8 text-right">{pct}%</span>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+              <div className="text-right shrink-0 space-y-2">
+                <div>
+                  <p className="text-xs text-gray-400">Swaps rated</p>
+                  <p className="text-xl font-bold text-dark">{profile.ratingCount}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400">Completed</p>
+                  <p className="text-xl font-bold text-dark">{profile.completedSwaps}</p>
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 pt-4 border-t border-gray-100 flex items-center gap-2">
+              <StarRow filled={Math.round(profile.rating)} />
+              <p className="text-sm text-gray-500">
+                {profile.rating >= 4.5 ? 'Highly trusted member' : profile.rating >= 3.5 ? 'Well-rated member' : profile.rating >= 2.5 ? 'Average rating' : 'Building reputation'}
+              </p>
+            </div>
+            {reviews.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
+                <p className="text-sm font-semibold text-dark">Individual feedback</p>
+                {reviews.map((r, i) => (
+                  <div key={i} className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-bold text-sm shrink-0">
+                      {r.raterName?.[0]?.toUpperCase() || '?'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="text-sm font-medium text-dark">{r.raterName}</span>
+                        <StarRow filled={r.rating} />
+                      </div>
+                      <p className="text-xs text-gray-400 truncate">For: {r.service}</p>
+                      <p className="text-xs text-gray-400">{new Date(r.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {listings.length > 0 && (

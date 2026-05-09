@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import api from '../services/api';
-import { Wallet, Plus, ArrowDownLeft, ArrowUpRight, IndianRupee } from 'lucide-react';
+import { Wallet, Plus, ArrowDownLeft, ArrowUpRight, IndianRupee, Handshake, Clock, CheckCircle, XCircle } from 'lucide-react';
 
 const QUICK_AMOUNTS = [50, 100, 500, 1000];
 
@@ -13,15 +13,20 @@ const txSign = { buy: '+', redeem: '-', sent: '-', received: '+' };
 export default function Credits() {
   const { user, setUser } = useAuth();
   const [transactions, setTransactions] = useState([]);
+  const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('buy');
   const [amount, setAmount] = useState('');
   const [acting, setActing] = useState(false);
+  const [counterInputs, setCounterInputs] = useState({});
+
+  const fetchOffers = () => api.get('/credit-offers/mine').then(r => setOffers(r.data)).catch(() => {});
 
   useEffect(() => {
-    api.get('/auth/credits/transactions')
-      .then(r => setTransactions(r.data))
-      .finally(() => setLoading(false));
+    Promise.all([
+      api.get('/auth/credits/transactions').then(r => setTransactions(r.data)).catch(() => {}),
+      fetchOffers(),
+    ]).finally(() => setLoading(false));
   }, []);
 
   const refreshUser = async () => {
@@ -52,7 +57,7 @@ export default function Credits() {
 
   const handleRedeem = async () => {
     const amt = parseInt(amount);
-    if (!amt || amt < 10) return toast.error('Minimum redemption is 10 credits');
+    if (!amt || amt < 10) return toast.error('Minimum redemption is 10 creditsedits');
     setActing(true);
     try {
       const { data } = await api.post('/auth/credits/redeem', { amount: amt });
@@ -68,6 +73,21 @@ export default function Credits() {
     }
   };
 
+  const handleOfferAction = async (offerId, action, extraData = {}) => {
+    try {
+      await api.patch(`/credit-offers/${offerId}/${action}`, extraData);
+      toast.success(action === 'accept' ? 'Offer accepted! Credits transferred.' : action === 'lock' ? 'Deal locked! Credits transferred.' : action === 'reject' ? 'Offer rejected.' : 'Counter offer sent.');
+      await fetchOffers();
+      if (action === 'accept' || action === 'lock') {
+        await refreshUser();
+        const { data: txs } = await api.get('/auth/credits/transactions');
+        setTransactions(txs);
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Action failed');
+    }
+  };
+
   return (
     <div className="max-w-3xl mx-auto px-6 py-8">
       <h1 className="text-2xl font-bold text-dark mb-6">Credits Wallet</h1>
@@ -80,7 +100,7 @@ export default function Credits() {
         </div>
         <p className="text-gray-500 text-sm mt-2 flex items-center gap-1">
           <IndianRupee size={13} />
-          {user.timeCredits} equivalent value · 1 credit = ₹1
+          {user.timeCredits} equivalent value · 1 creditsedit = ₹1
         </p>
       </div>
 
@@ -99,7 +119,7 @@ export default function Credits() {
 
         {tab === 'buy' ? (
           <>
-            <p className="text-sm text-gray-500 mb-4">Pay ₹1 = get 1 credit. Use credits to pay for services directly without swapping.</p>
+            <p className="text-sm text-gray-500 mb-4">Pay ₹1 = get 1 creditsedit. Use creditsedits to pay for services directly without swapping.</p>
             <div className="flex flex-wrap gap-2 mb-4">
               {QUICK_AMOUNTS.map(a => (
                 <button
@@ -133,14 +153,14 @@ export default function Credits() {
           </>
         ) : (
           <>
-            <p className="text-sm text-gray-500 mb-4">Redeem your credits to ₹INR. Minimum 10 credits. Processing takes 2–3 business days.</p>
+            <p className="text-sm text-gray-500 mb-4">Redeem your creditsedits to ₹INR. Minimum 10 creditsedits. Processing takes 2–3 business days.</p>
             <div className="flex gap-3">
               <div className="relative flex-1">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium">₹</span>
                 <input
                   type="number"
                   className="input pl-7"
-                  placeholder="Enter credits to redeem"
+                  placeholder="Enter creditsedits to redeem"
                   min="10"
                   max={user.timeCredits}
                   value={amount}
@@ -151,10 +171,107 @@ export default function Credits() {
                 {acting ? 'Processing...' : `Get ₹${amount || 0}`}
               </button>
             </div>
-            <p className="text-xs text-gray-400 mt-2">You have {user.timeCredits} credits (₹{user.timeCredits}) available.</p>
+            <p className="text-xs text-gray-400 mt-2">You have {user.timeCredits} creditsedits (₹{user.timeCredits}) available.</p>
           </>
         )}
       </div>
+
+      {offers.filter(o => ['pending', 'countered'].includes(o.status)).length > 0 && (
+        <div className="mb-6">
+          <h2 className="font-bold text-lg text-dark mb-4 flex items-center gap-2">
+            <Handshake size={18} className="text-primary-500" />
+            Active Credit Offers
+          </h2>
+          <div className="space-y-3">
+            {offers.filter(o => ['pending', 'countered'].includes(o.status)).map(offer => {
+              const isBuyer = offer.buyerId === user.id;
+              return (
+                <div key={offer._id} className="card p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <p className="font-semibold text-dark text-sm">{offer.listingTitle}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {isBuyer ? `To: ${offer.sellerName}` : `From: ${offer.buyerName}`}
+                      </p>
+                    </div>
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${offer.status === 'countered' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>
+                      {offer.status === 'countered' ? 'Counter received' : 'Pending'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-4 text-sm mb-3">
+                    <div>
+                      <span className="text-gray-400 text-xs">Your offer</span>
+                      <p className="font-bold text-dark">{offer.proposedAmount} credits</p>
+                    </div>
+                    {offer.counterAmount && (
+                      <>
+                        <span className="text-gray-300">→</span>
+                        <div>
+                          <span className="text-gray-400 text-xs">Counter offer</span>
+                          <p className="font-bold text-orange-600">{offer.counterAmount} credits</p>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {offer.message && (
+                    <p className="text-xs text-gray-500 bg-gray-50 rounded p-2 mb-3">"{offer.message}"</p>
+                  )}
+
+                  <div className="flex gap-2 flex-wrap">
+                    {!isBuyer && offer.status === 'pending' && (
+                      <>
+                        <button onClick={() => handleOfferAction(offer._id, 'accept')} className="btn-primary text-xs py-1.5 px-3 flex items-center gap-1">
+                          <CheckCircle size={13} /> Accept {offer.proposedAmount} credits
+                        </button>
+                        <div className="flex gap-1">
+                          <input
+                            type="number"
+                            className="input text-xs py-1.5 w-24"
+                            placeholder="Counter..."
+                            value={counterInputs[offer._id] || ''}
+                            onChange={e => setCounterInputs(p => ({ ...p, [offer._id]: e.target.value }))}
+                          />
+                          <button
+                            onClick={() => {
+                              if (!counterInputs[offer._id]) return toast.error('Enter counter amount');
+                              handleOfferAction(offer._id, 'counter', { counterAmount: parseInt(counterInputs[offer._id]) });
+                              setCounterInputs(p => ({ ...p, [offer._id]: '' }));
+                            }}
+                            className="btn-outline text-xs py-1.5 px-3"
+                          >
+                            Counter
+                          </button>
+                        </div>
+                        <button onClick={() => handleOfferAction(offer._id, 'reject')} className="text-xs text-red-500 hover:text-red-700 px-2 flex items-center gap-1">
+                          <XCircle size={13} /> Reject
+                        </button>
+                      </>
+                    )}
+                    {isBuyer && offer.status === 'countered' && (
+                      <>
+                        <button onClick={() => handleOfferAction(offer._id, 'lock')} className="btn-primary text-xs py-1.5 px-3 flex items-center gap-1">
+                          <CheckCircle size={13} /> Lock deal at {offer.counterAmount} credits
+                        </button>
+                        <button onClick={() => handleOfferAction(offer._id, 'reject')} className="text-xs text-red-500 hover:text-red-700 px-2 flex items-center gap-1">
+                          <XCircle size={13} /> Reject
+                        </button>
+                      </>
+                    )}
+                    {!isBuyer && offer.status === 'countered' && (
+                      <p className="text-xs text-gray-400 flex items-center gap-1"><Clock size={12} /> Waiting for buyer to respond to your counter</p>
+                    )}
+                    {isBuyer && offer.status === 'pending' && (
+                      <p className="text-xs text-gray-400 flex items-center gap-1"><Clock size={12} /> Waiting for seller to respond</p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div>
         <h2 className="font-bold text-lg text-dark mb-4">Transaction History</h2>
@@ -184,7 +301,7 @@ export default function Credits() {
                     </div>
                   </div>
                   <span className={`font-bold text-base ${txColor[tx.type]}`}>
-                    {txSign[tx.type]}{tx.amount} cr
+                    {txSign[tx.type]}{tx.amount} credits
                   </span>
                 </div>
               );

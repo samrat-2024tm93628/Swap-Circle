@@ -1,7 +1,56 @@
 const router = require('express').Router();
+const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const CreditTransaction = require('../models/CreditTransaction');
 const verifyToken = require('../middleware/verifyToken');
+
+const verifyServiceToken = (req, res, next) => {
+  try {
+    const token = req.headers['authorization']?.split(' ')[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
+    next();
+  } catch {
+    res.status(401).json({ message: 'Unauthorized' });
+  }
+};
+
+router.post('/internal-transfer', verifyServiceToken, async (req, res) => {
+  try {
+    const { fromUserId, toUserId, amount, listingTitle } = req.body;
+
+    const sender = await User.findById(fromUserId);
+    if (!sender) return res.status(404).json({ message: 'Buyer not found' });
+    if (sender.timeCredits < amount) return res.status(400).json({ message: 'Buyer has insufficient credits' });
+
+    const receiver = await User.findById(toUserId);
+    if (!receiver) return res.status(404).json({ message: 'Seller not found' });
+
+    await User.findByIdAndUpdate(fromUserId, { $inc: { timeCredits: -amount } });
+    await User.findByIdAndUpdate(toUserId, { $inc: { timeCredits: amount } });
+
+    await CreditTransaction.create({
+      userId: fromUserId,
+      type: 'sent',
+      amount,
+      description: `Paid for: ${listingTitle}`,
+      counterpartId: toUserId,
+      counterpartName: receiver.name,
+    });
+    await CreditTransaction.create({
+      userId: toUserId,
+      type: 'received',
+      amount,
+      description: `Payment for: ${listingTitle}`,
+      counterpartId: fromUserId,
+      counterpartName: sender.name,
+    });
+
+    res.json({ message: 'Transfer complete' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 
 router.get('/stats/:userId', async (req, res) => {
   try {

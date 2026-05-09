@@ -61,7 +61,11 @@ router.patch('/:userId/rating', async (req, res) => {
 
     const updated = await Profile.findOneAndUpdate(
       { userId: req.params.userId },
-      { rating: Math.round(newRating * 10) / 10, ratingCount: newCount, $inc: { completedSwaps: 1 } },
+      {
+        rating: Math.round(newRating * 10) / 10,
+        ratingCount: newCount,
+        $inc: { completedSwaps: 1, [`ratingBreakdown.${rating}`]: 1 },
+      },
       { new: true }
     );
     res.json(updated);

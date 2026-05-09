@@ -232,4 +232,28 @@ router.patch('/:id/rate', auth, async (req, res) => {
   }
 });
 
+router.get('/ratings/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const swaps = await Swap.find({
+      status: 'completed',
+      $or: [
+        { receiverId: userId, proposerRating: { $ne: null } },
+        { proposerId: userId, receiverRating: { $ne: null } },
+      ],
+    }).sort({ completedAt: -1 });
+
+    const reviews = swaps.map(s => {
+      if (s.receiverId === userId && s.proposerRating != null) {
+        return { rating: s.proposerRating, raterName: s.proposerName, service: s.requestedListingTitle, date: s.completedAt || s.updatedAt };
+      }
+      return { rating: s.receiverRating, raterName: s.receiverName, service: s.offeredListingTitle, date: s.completedAt || s.updatedAt };
+    });
+
+    res.json(reviews);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 module.exports = router;

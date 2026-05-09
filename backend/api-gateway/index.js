@@ -36,6 +36,11 @@ app.use('/api/swaps', proxy(process.env.SWAP_SERVICE_URL, {
   proxyReqPathResolver: req => `/swaps${req.url}`
 }));
 
+app.use('/api/credit-offers', proxy(process.env.SWAP_SERVICE_URL, {
+  ...forwardHeaders,
+  proxyReqPathResolver: req => `/credit-offers${req.url}`
+}));
+
 app.get('/health', (_, res) => res.json({ status: 'ok' }));
 
 app.listen(process.env.PORT || 3000, () =>

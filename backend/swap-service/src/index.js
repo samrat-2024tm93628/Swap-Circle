@@ -11,6 +11,7 @@ app.use(express.json());
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use('/swaps', require('./routes/swaps'));
+app.use('/credit-offers', require('./routes/creditOffers'));
 
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => {
