@@ -1,10 +1,10 @@
 # Database Schema
 
-SwapCircle uses MongoDB with four separate databases — one per microservice.
+SwapCircle uses MongoDB with four separate databases  one per microservice.
 
 ---
 
-## swapcircle_auth — Auth Service
+## swapcircle_auth  Auth Service
 
 ### Collection: `users`
 
@@ -23,7 +23,7 @@ SwapCircle uses MongoDB with four separate databases — one per microservice.
 
 ---
 
-## swapcircle_users — User Service
+## swapcircle_users  User Service
 
 ### Collection: `profiles`
 
@@ -44,7 +44,7 @@ SwapCircle uses MongoDB with four separate databases — one per microservice.
 
 ---
 
-## swapcircle_listings — Listing Service
+## swapcircle_listings  Listing Service
 
 ### Collection: `listings`
 
@@ -69,7 +69,7 @@ SwapCircle uses MongoDB with four separate databases — one per microservice.
 
 ---
 
-## swapcircle_swaps — Swap Service
+## swapcircle_swaps  Swap Service
 
 ### Collection: `swaps`
 

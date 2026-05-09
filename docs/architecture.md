@@ -1,10 +1,10 @@
-# SwapCircle — Architecture & Design
+# SwapCircle  Architecture & Design
 
 ## Problem Statement
 
 People often have skills or time to offer but lack money to pay for services they need.
 SwapCircle is a peer-to-peer barter platform where users post what they can offer and
-what they need, then negotiate direct skill-for-skill swaps — no money involved.
+what they need, then negotiate direct skill-for-skill swaps  no money involved.
 
 ---
 
@@ -125,7 +125,7 @@ references are plain string IDs. This keeps services independent and deployable 
 **Denormalized display data:** userName, listingTitle etc. are stored inside swap
 documents to avoid cross-service queries on every read.
 
-**JWT verified per service:** The gateway does not validate tokens — each service does.
+**JWT verified per service:** The gateway does not validate tokens  each service does.
 This means any service can be called directly in development without the gateway.
 
 **Conflict prevention:** Before creating a swap, the swap service checks for existing
@@ -136,7 +136,7 @@ active swaps on the same listing pair to prevent double-booking.
 ## Assumptions
 
 - Single-machine local deployment (all services on localhost)
-- No email verification — registration is immediate
+- No email verification  registration is immediate
 - Time credits are cosmetic in this version (not enforced as payment)
-- No real-time notifications — users refresh to see new proposals
-- Images/avatars not supported — initials avatar used instead
+- No real-time notifications  users refresh to see new proposals
+- Images/avatars not supported  initials avatar used instead
