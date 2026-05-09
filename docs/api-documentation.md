@@ -66,29 +66,137 @@ Get current authenticated user.
   "name": "John Doe",
   "email": "john@example.com",
   "role": "user",
-  "timeCredits": 5,
+  "timeCredits": 42,
   "createdAt": "2024-05-01T10:00:00.000Z"
 }
 ```
 
 ---
 
-### PATCH `/api/auth/credits` *(protected)*
-Adjust time credits for current user.
+## Credits Wallet `/api/auth/credits`
+
+### GET `/api/auth/credits/stats/:userId`
+Get aggregated credit statistics for any user. Public endpoint.
+
+**Response `200`:**
+```json
+{
+  "currentBalance": 42,
+  "totalBought": 1000,
+  "totalRedeemed": 50,
+  "totalReceived": 150,
+  "totalSpent": 200,
+  "totalEarned": 1150,
+  "transactionCount": 18
+}
+```
+
+---
+
+### GET `/api/auth/credits/transactions` *(protected)*
+Get the last 50 credit transactions for the logged-in user, newest first.
+
+**Response `200`:**
+```json
+[
+  {
+    "_id": "...",
+    "userId": "664f1a2b...",
+    "type": "buy",
+    "amount": 500,
+    "description": "Purchased 500 credits for ₹500",
+    "counterpartId": null,
+    "counterpartName": null,
+    "createdAt": "2024-05-01T10:00:00.000Z"
+  }
+]
+```
+
+**Transaction types:** `buy`, `redeem`, `sent`, `received`
+
+---
+
+### POST `/api/auth/credits/buy` *(protected)*
+Purchase credits (simulated — no real payment gateway).
 
 **Request Body:**
 ```json
-{ "amount": 2 }
+{ "amount": 500 }
 ```
 
-**Response `200`:** Updated user object.
+**Rules:** `amount` min 1, max 10000.
+
+**Response `200`:**
+```json
+{
+  "user": { "id": "...", "timeCredits": 542, ... },
+  "message": "500 credits added to your wallet"
+}
+```
+
+---
+
+### POST `/api/auth/credits/redeem` *(protected)*
+Request cash redemption of credits (simulated, logged only).
+
+**Request Body:**
+```json
+{ "amount": 100 }
+```
+
+**Rules:** `amount` min 10. User must have sufficient balance.
+
+**Response `200`:**
+```json
+{
+  "user": { "id": "...", "timeCredits": 442, ... },
+  "message": "₹100 redemption request submitted"
+}
+```
+
+**Error `400`:** Insufficient credits
+
+---
+
+### POST `/api/auth/credits/pay` *(protected)*
+Direct immediate credit payment from logged-in user to another user. Credits transfer instantly.
+
+**Request Body:**
+```json
+{
+  "toUserId": "664abc...",
+  "toUserName": "Jane Smith",
+  "amount": 50,
+  "listingTitle": "Guitar lessons"
+}
+```
+
+**Error `400`:** Insufficient credits or invalid details  
+**Error `400`:** Cannot pay yourself
+
+---
+
+### POST `/api/auth/credits/internal-transfer` *(service token only)*
+Internal service-to-service credit transfer. Called by swap service when a credit offer is accepted or locked. Not accessible by clients.
+
+**Request Body:**
+```json
+{
+  "fromUserId": "664abc...",
+  "toUserId": "664def...",
+  "amount": 150,
+  "listingTitle": "Bike repair"
+}
+```
+
+**Error `400`:** Buyer has insufficient credits
 
 ---
 
 ## User Service `/api/users`
 
 ### GET `/api/users/:userId`
-Get a user's profile. Auto-creates a blank profile if none exists.
+Get a user's public profile. Auto-creates a blank profile if none exists yet.
 
 **Response `200`:**
 ```json
@@ -100,6 +208,7 @@ Get a user's profile. Auto-creates a blank profile if none exists.
   "location": "Mumbai, India",
   "rating": 4.5,
   "ratingCount": 6,
+  "ratingBreakdown": { "1": 0, "2": 0, "3": 1, "4": 2, "5": 3 },
   "completedSwaps": 6
 }
 ```
@@ -118,55 +227,37 @@ Update bio, skills, and location.
 }
 ```
 
-**Response `200`:** Updated profile object.
-
+**Response `200`:** Updated profile object.  
 **Error `403`:** Cannot edit another user's profile.
 
 ---
 
-### PATCH `/api/users/:userId/rating`
-Update a user's rating (called internally by swap service after completion).
+### PATCH `/api/users/:userId/rating` *(service token only)*
+Update a user's rolling average rating. Called internally by swap service after a rating is submitted. Increments `ratingBreakdown[star]` and recalculates weighted average.
 
 **Request Body:**
 ```json
 { "rating": 4 }
 ```
 
-**Response `200`:** Updated profile with new averaged rating.
+**Response `200`:** Updated profile with new averaged rating and incremented `completedSwaps`.
 
 ---
 
 ## Listing Service `/api/listings`
 
 ### GET `/api/listings`
-Fetch active listings with optional filters.
+Fetch active listings with optional filters. Defaults to `status=active`.
 
 **Query Params:**
 | Param | Type | Description |
 |-------|------|-------------|
 | `type` | `offer` \| `request` | Filter by listing type |
 | `category` | string | Filter by category |
-| `search` | string | Search by title (case-insensitive) |
-| `status` | string | Defaults to `active` |
+| `search` | string | Search by title (case-insensitive regex) |
+| `status` | string | Override status filter |
 
-**Response `200`:**
-```json
-[
-  {
-    "_id": "...",
-    "userId": "664f1a2b...",
-    "userName": "John Doe",
-    "type": "offer",
-    "title": "I'll fix your bike",
-    "description": "I have 5+ years of experience with all types of bikes.",
-    "category": "Home Services",
-    "estimatedHours": 2,
-    "tags": ["bike", "repair", "weekend"],
-    "status": "active",
-    "createdAt": "2024-05-01T10:00:00.000Z"
-  }
-]
-```
+**Response `200`:** Array of listing objects.
 
 ---
 
@@ -179,7 +270,7 @@ Get a single listing by ID.
 ---
 
 ### GET `/api/listings/user/:userId` *(protected)*
-Get all listings created by a specific user.
+Get all listings created by a specific user (all statuses).
 
 **Response `200`:** Array of listing objects.
 
@@ -207,9 +298,7 @@ Create a new listing.
 ---
 
 ### PUT `/api/listings/:id` *(protected)*
-Update a listing. Only the owner (or admin) can update.
-
-**Request Body:** Any subset of listing fields.
+Update a listing. Only the owner or admin role can update. Also used internally by swap service (with admin token) to change `status`.
 
 **Response `200`:** Updated listing object.  
 **Error `403`:** Not the owner.
@@ -242,7 +331,7 @@ Propose a new swap between two listings.
 **Rules:**
 - `offeredListingId` must belong to the proposer.
 - `requestedListingId` must belong to the receiver.
-- No duplicate active swaps allowed for the same listing pair.
+- No duplicate active swaps allowed (`pending`, `accepted`, `in-progress`) for the same listing pair.
 
 **Response `201`:** Created swap object.  
 **Error `403`:** Offered listing is not yours.  
@@ -257,33 +346,33 @@ Get all swaps where the current user is proposer or receiver, sorted newest firs
 
 ---
 
-### GET `/api/swaps/:id` *(protected)*
-Get details of a specific swap. Only accessible to the two parties.
+### GET `/api/swaps/ratings/:userId`
+Get all individual ratings received by a user from completed swaps. Public endpoint used for the profile feedback list.
 
 **Response `200`:**
 ```json
-{
-  "_id": "...",
-  "proposerId": "664f1a2b...",
-  "proposerName": "John Doe",
-  "receiverId": "664f2b3c...",
-  "receiverName": "Jane Smith",
-  "offeredListingId": "...",
-  "offeredListingTitle": "I'll fix your bike",
-  "requestedListingId": "...",
-  "requestedListingTitle": "I'll teach you guitar",
-  "message": "Sounds like a fair deal!",
-  "status": "pending",
-  "proposerRating": null,
-  "receiverRating": null,
-  "createdAt": "2024-05-01T10:00:00.000Z"
-}
+[
+  {
+    "rating": 5,
+    "raterName": "Jane Smith",
+    "service": "I'll teach you guitar",
+    "date": "2024-05-10T08:00:00.000Z"
+  }
+]
 ```
 
 ---
 
+### GET `/api/swaps/:id` *(protected)*
+Get details of a specific swap. Only accessible to the two parties involved.
+
+**Response `200`:** Full swap object.  
+**Error `403`:** Not a participant.
+
+---
+
 ### PATCH `/api/swaps/:id/accept` *(protected, receiver only)*
-Accept an incoming swap proposal. Both listings move to `in-swap` status.
+Accept an incoming swap proposal. Both listings move to `in-swap` status via service token call to listing service.
 
 **Response `200`:** Updated swap with `status: "accepted"`.  
 **Error `400`:** Swap is not in `pending` state.
@@ -298,14 +387,14 @@ Reject an incoming swap proposal.
 ---
 
 ### PATCH `/api/swaps/:id/cancel` *(protected, proposer only)*
-Cancel a swap you proposed (only when `pending` or `accepted`).
+Cancel a swap you proposed. If it was `accepted`, both listings revert to `active`.
 
 **Response `200`:** Updated swap with `status: "cancelled"`.
 
 ---
 
 ### PATCH `/api/swaps/:id/complete` *(protected)*
-Mark a swap as completed. Both listings move to `completed` status.
+Mark a swap as completed. Either party can trigger. Both listings move to `completed` status.
 
 **Response `200`:** Updated swap with `status: "completed"`.  
 **Error `400`:** Swap must be in `accepted` state first.
@@ -313,7 +402,7 @@ Mark a swap as completed. Both listings move to `completed` status.
 ---
 
 ### PATCH `/api/swaps/:id/rate` *(protected)*
-Submit a rating (1–5) after a swap is completed. Each party rates once.
+Submit a star rating (1–5) after a swap is completed. Each party rates the other once. Internally calls user service to update the rated user's rolling average and `ratingBreakdown`.
 
 **Request Body:**
 ```json
@@ -321,16 +410,116 @@ Submit a rating (1–5) after a swap is completed. Each party rates once.
 ```
 
 **Response `200`:** Updated swap with rating recorded.  
-**Error `400`:** Already rated, or swap not completed yet.
+**Error `400`:** Already rated, or swap not completed.
 
 ---
 
 ## Swap Status Flow
 
-```
+```text
 pending → accepted → completed
 pending → rejected
 pending → cancelled
-accepted → cancelled
-accepted → completed
+accepted → cancelled  (listings revert to active)
+accepted → completed  (listings move to completed)
+```
+
+---
+
+## Credit Offers `/api/credit-offers`
+
+The credit offer system allows buyers to negotiate a price before credits are transferred. No credits are held or deducted during negotiation — transfer happens only on final acceptance.
+
+### POST `/api/credit-offers` *(protected)*
+Buyer proposes a credit amount for a listing.
+
+**Request Body:**
+```json
+{
+  "listingId": "664abc...",
+  "listingTitle": "Guitar lessons",
+  "sellerId": "664seller...",
+  "sellerName": "Jane Smith",
+  "proposedAmount": 150,
+  "message": "Is 150 credits fair for 1.5 hours?"
+}
+```
+
+**Error `400`:** Cannot offer on your own listing.  
+**Error `409`:** Already have an active offer on this listing.
+
+**Response `201`:** Created credit offer object with `status: "pending"`.
+
+---
+
+### GET `/api/credit-offers/mine` *(protected)*
+Get all credit offers where the current user is buyer or seller, sorted newest first.
+
+**Response `200`:**
+```json
+[
+  {
+    "_id": "...",
+    "listingTitle": "Guitar lessons",
+    "buyerId": "...",
+    "buyerName": "John Doe",
+    "sellerId": "...",
+    "sellerName": "Jane Smith",
+    "proposedAmount": 150,
+    "counterAmount": null,
+    "finalAmount": null,
+    "message": "Is 150 credits fair?",
+    "status": "pending",
+    "createdAt": "..."
+  }
+]
+```
+
+---
+
+### PATCH `/api/credit-offers/:id/accept` *(protected, seller only)*
+Seller accepts the offer. Credits transfer immediately from buyer to seller via internal auth service call.
+
+**Response `200`:** Updated offer with `status: "accepted"` and `finalAmount` set.  
+**Error `400`:** Offer is not active.  
+**Error `400`:** Buyer has insufficient credits.
+
+---
+
+### PATCH `/api/credit-offers/:id/counter` *(protected, seller only)*
+Seller proposes a different amount. Offer moves to `countered` state.
+
+**Request Body:**
+```json
+{ "counterAmount": 120 }
+```
+
+**Response `200`:** Updated offer with `status: "countered"` and `counterAmount` set.  
+**Error `400`:** Can only counter a pending offer.
+
+---
+
+### PATCH `/api/credit-offers/:id/lock` *(protected, buyer only)*
+Buyer accepts the seller's counter offer. Credits transfer immediately.
+
+**Response `200`:** Updated offer with `status: "accepted"` and `finalAmount` set to `counterAmount`.  
+**Error `400`:** No counter offer to accept.  
+**Error `400`:** Buyer has insufficient credits.
+
+---
+
+### PATCH `/api/credit-offers/:id/reject` *(protected)*
+Either the buyer or seller rejects/withdraws the offer. No credits affected.
+
+**Response `200`:** Updated offer with `status: "rejected"`.
+
+---
+
+## Credit Offer Status Flow
+
+```text
+pending → accepted          (seller accepts directly)
+pending → countered         (seller counters)
+countered → accepted        (buyer locks deal)
+pending/countered → rejected (either party)
 ```
