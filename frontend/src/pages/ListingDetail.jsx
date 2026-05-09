@@ -3,26 +3,31 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import api from '../services/api';
-import { Clock, Tag, ArrowLeftRight, Trash2 } from 'lucide-react';
+import { Clock, Tag, ArrowLeftRight, Trash2, IndianRupee } from 'lucide-react';
 
 export default function ListingDetail() {
   const { id } = useParams();
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const navigate = useNavigate();
   const [listing, setListing] = useState(null);
   const [myListings, setMyListings] = useState([]);
   const [selectedOffer, setSelectedOffer] = useState('');
   const [message, setMessage] = useState('');
   const [proposing, setProposing] = useState(false);
+  const [paying, setPaying] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [showPropose, setShowPropose] = useState(false);
+  const [mode, setMode] = useState(null);
+  const [creditAmount, setCreditAmount] = useState('');
 
   useEffect(() => {
     Promise.all([
-      api.get(`/listings/${id}`).then(r => setListing(r.data)),
-      api.get(`/listings/user/${user.id}`).then(r =>
-        setMyListings(r.data.filter(l => l.status === 'active' && l.type === 'offer'))
-      ),
+      api.get(`/listings/${id}`).then(r => {
+        setListing(r.data);
+        setCreditAmount(String(r.data.estimatedHours));
+      }),
+      api.get(`/listings/user/${user.id}`)
+        .then(r => setMyListings(r.data.filter(l => l.status === 'active' && l.type === 'offer')))
+        .catch(() => setMyListings([])),
     ]).finally(() => setLoading(false));
   }, [id, user.id]);
 
@@ -55,6 +60,31 @@ export default function ListingDetail() {
       toast.error(err.response?.data?.message || 'Failed to propose');
     } finally {
       setProposing(false);
+    }
+  };
+
+  const handlePayCredits = async () => {
+    const amt = parseInt(creditAmount);
+    if (!amt || amt < 1) return toast.error('Enter a valid amount');
+    if (user.timeCredits < amt) return toast.error(`Insufficient credits. You have ${user.timeCredits}.`);
+    setPaying(true);
+    try {
+      const { data } = await api.post('/auth/credits/pay', {
+        toUserId: listing.userId,
+        toUserName: listing.userName,
+        amount: amt,
+        listingTitle: listing.title,
+      });
+      const stored = JSON.parse(localStorage.getItem('user') || '{}');
+      const updated = { ...stored, timeCredits: data.user.timeCredits };
+      localStorage.setItem('user', JSON.stringify(updated));
+      setUser(updated);
+      toast.success(data.message);
+      navigate('/credits');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Payment failed');
+    } finally {
+      setPaying(false);
     }
   };
 
@@ -108,14 +138,25 @@ export default function ListingDetail() {
 
         {!isOwner && listing.status === 'active' && (
           <div className="border-t border-gray-100 pt-6">
-            {!showPropose ? (
-              <button onClick={() => setShowPropose(true)} className="btn-primary w-full py-3 flex items-center justify-center gap-2">
-                <ArrowLeftRight size={18} />
-                Propose a swap
-              </button>
-            ) : (
+            {!mode && (
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={() => setMode('swap')} className="btn-primary py-3 flex items-center justify-center gap-2">
+                  <ArrowLeftRight size={18} />
+                  Propose a swap
+                </button>
+                <button onClick={() => setMode('pay')} className="btn-outline py-3 flex items-center justify-center gap-2">
+                  <IndianRupee size={18} />
+                  Pay with credits
+                </button>
+              </div>
+            )}
+
+            {mode === 'swap' && (
               <form onSubmit={handlePropose} className="space-y-4">
-                <h3 className="font-semibold text-dark">What will you offer in return?</h3>
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className="font-semibold text-dark">What will you offer in return?</h3>
+                  <button type="button" onClick={() => setMode(null)} className="text-sm text-gray-400 hover:text-gray-600">← Back</button>
+                </div>
                 {myListings.length === 0 ? (
                   <div className="text-sm text-gray-500 bg-gray-50 rounded-lg p-4">
                     You need to post an offer first.{' '}
@@ -127,21 +168,43 @@ export default function ListingDetail() {
                       <option value="">Select your offer</option>
                       {myListings.map(l => <option key={l._id} value={l._id}>{l.title}</option>)}
                     </select>
-                    <textarea
-                      className="input resize-none h-24"
-                      placeholder="Add a message (optional)"
-                      value={message}
-                      onChange={e => setMessage(e.target.value)}
-                    />
-                    <div className="flex gap-3">
-                      <button type="button" onClick={() => setShowPropose(false)} className="btn-outline flex-1">Cancel</button>
-                      <button type="submit" disabled={proposing} className="btn-primary flex-1 disabled:opacity-60">
-                        {proposing ? 'Sending...' : 'Send proposal'}
-                      </button>
-                    </div>
+                    <textarea className="input resize-none h-24" placeholder="Add a message (optional)" value={message} onChange={e => setMessage(e.target.value)} />
+                    <button type="submit" disabled={proposing} className="btn-primary w-full disabled:opacity-60">
+                      {proposing ? 'Sending...' : 'Send proposal'}
+                    </button>
                   </>
                 )}
               </form>
+            )}
+
+            {mode === 'pay' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className="font-semibold text-dark">Pay with credits</h3>
+                  <button type="button" onClick={() => setMode(null)} className="text-sm text-gray-400 hover:text-gray-600">← Back</button>
+                </div>
+                <div className="bg-primary-50 rounded-lg p-4 text-sm text-primary-800">
+                  <p>Suggested: <strong>{listing.estimatedHours} credits</strong> for {listing.estimatedHours}h of work</p>
+                  <p className="text-primary-600 mt-0.5">You have <strong>{user.timeCredits} credits</strong> (₹{user.timeCredits})</p>
+                </div>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium text-sm">₹</span>
+                  <input
+                    type="number"
+                    className="input pl-7"
+                    placeholder="Enter credits to pay"
+                    min="1"
+                    max={user.timeCredits}
+                    value={creditAmount}
+                    onChange={e => setCreditAmount(e.target.value)}
+                  />
+                </div>
+                <button onClick={handlePayCredits} disabled={paying || !creditAmount} className="btn-primary w-full py-3 flex items-center justify-center gap-2 disabled:opacity-60">
+                  <IndianRupee size={18} />
+                  {paying ? 'Processing...' : `Pay ₹${creditAmount || 0} to ${listing.userName}`}
+                </button>
+                <p className="text-xs text-gray-400 text-center">Credits transfer instantly. No swap needed.</p>
+              </div>
             )}
           </div>
         )}

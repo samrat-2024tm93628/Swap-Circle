@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 import ListingCard from '../components/ListingCard';
-import { Star, MapPin, ArrowLeftRight, Edit2, Check, X } from 'lucide-react';
+import { Star, MapPin, ArrowLeftRight, Edit2, Check, X, Wallet, TrendingUp, TrendingDown, IndianRupee, BarChart2 } from 'lucide-react';
 
 export default function Profile() {
   const { userId } = useParams();
@@ -14,6 +14,7 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ bio: '', location: '', skills: '' });
+  const [stats, setStats] = useState(null);
 
   const isOwn = user.id === userId;
 
@@ -29,7 +30,11 @@ export default function Profile() {
       .then(r => setListings(r.data.filter(l => l.status === 'active')))
       .catch(() => setListings([]));
 
-    Promise.all([fetchProfile, fetchListings]).finally(() => setLoading(false));
+    const fetchStats = api.get(`/auth/credits/stats/${userId}`)
+      .then(r => setStats(r.data))
+      .catch(() => {});
+
+    Promise.all([fetchProfile, fetchListings, fetchStats]).finally(() => setLoading(false));
   }, [userId]);
 
   const saveProfile = async () => {
@@ -55,10 +60,10 @@ export default function Profile() {
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-5">
             <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center text-primary-700 font-black text-2xl">
-              {user.name[0].toUpperCase()}
+              {(isOwn ? user.name : (profile?.name || 'U'))[0].toUpperCase()}
             </div>
             <div>
-              <h1 className="text-xl font-bold text-dark">{isOwn ? user.name : userId}</h1>
+              <h1 className="text-xl font-bold text-dark">{isOwn ? user.name : (profile?.name || userId)}</h1>
               <div className="flex items-center gap-3 mt-1">
                 {profile?.rating > 0 && (
                   <div className="flex items-center gap-1 text-sm text-gray-600">
@@ -127,6 +132,80 @@ export default function Profile() {
               )}
             </>
           )}
+        </div>
+      </div>
+
+      <div className="mb-6">
+        <h2 className="font-bold text-lg text-dark mb-3 flex items-center gap-2">
+          <BarChart2 size={18} className="text-primary-500" />
+          Activity Stats
+        </h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div className="card p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-8 h-8 bg-primary-50 rounded-lg flex items-center justify-center">
+                <Wallet size={15} className="text-primary-600" />
+              </div>
+              <span className="text-xs text-gray-500 font-medium">Current Balance</span>
+            </div>
+            <p className="text-2xl font-black text-primary-600">{stats?.currentBalance ?? '—'}</p>
+            <p className="text-xs text-gray-400 mt-0.5">credits</p>
+          </div>
+
+          <div className="card p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-8 h-8 bg-green-50 rounded-lg flex items-center justify-center">
+                <TrendingUp size={15} className="text-green-600" />
+              </div>
+              <span className="text-xs text-gray-500 font-medium">Total Earned</span>
+            </div>
+            <p className="text-2xl font-black text-green-600">{stats?.totalEarned ?? '—'}</p>
+            <p className="text-xs text-gray-400 mt-0.5">bought + received</p>
+          </div>
+
+          <div className="card p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-8 h-8 bg-red-50 rounded-lg flex items-center justify-center">
+                <TrendingDown size={15} className="text-red-500" />
+              </div>
+              <span className="text-xs text-gray-500 font-medium">Total Spent</span>
+            </div>
+            <p className="text-2xl font-black text-red-500">{stats?.totalSpent ?? '—'}</p>
+            <p className="text-xs text-gray-400 mt-0.5">paid to others</p>
+          </div>
+
+          <div className="card p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
+                <IndianRupee size={15} className="text-blue-600" />
+              </div>
+              <span className="text-xs text-gray-500 font-medium">Credits Bought</span>
+            </div>
+            <p className="text-2xl font-black text-blue-600">{stats?.totalBought ?? '—'}</p>
+            <p className="text-xs text-gray-400 mt-0.5">purchased</p>
+          </div>
+
+          <div className="card p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-8 h-8 bg-orange-50 rounded-lg flex items-center justify-center">
+                <IndianRupee size={15} className="text-orange-500" />
+              </div>
+              <span className="text-xs text-gray-500 font-medium">Redeemed</span>
+            </div>
+            <p className="text-2xl font-black text-orange-500">{stats?.totalRedeemed ?? '—'}</p>
+            <p className="text-xs text-gray-400 mt-0.5">withdrawn</p>
+          </div>
+
+          <div className="card p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-8 h-8 bg-primary-50 rounded-lg flex items-center justify-center">
+                <ArrowLeftRight size={15} className="text-primary-600" />
+              </div>
+              <span className="text-xs text-gray-500 font-medium">Swaps Done</span>
+            </div>
+            <p className="text-2xl font-black text-primary-600">{profile?.completedSwaps ?? 0}</p>
+            <p className="text-xs text-gray-400 mt-0.5">completed</p>
+          </div>
         </div>
       </div>
 

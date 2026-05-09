@@ -11,6 +11,7 @@ app.use(express.json());
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use('/auth', require('./routes/auth'));
+app.use('/auth/credits', require('./routes/credits'));
 
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => {

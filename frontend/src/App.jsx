@@ -11,6 +11,7 @@ import CreateListing from './pages/CreateListing';
 import MySwaps from './pages/MySwaps';
 import SwapDetail from './pages/SwapDetail';
 import Profile from './pages/Profile';
+import Credits from './pages/Credits';
 
 function Protected({ children }) {
   const { user, loading } = useAuth();
@@ -35,6 +36,7 @@ export default function App() {
         <Route path="/swaps" element={<Protected><MySwaps /></Protected>} />
         <Route path="/swaps/:id" element={<Protected><SwapDetail /></Protected>} />
         <Route path="/profile/:userId" element={<Protected><Profile /></Protected>} />
+        <Route path="/credits" element={<Protected><Credits /></Protected>} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </div>

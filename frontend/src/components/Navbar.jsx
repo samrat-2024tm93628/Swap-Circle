@@ -1,6 +1,6 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { ArrowLeftRight, PlusCircle, Repeat2, LogOut, LayoutDashboard } from 'lucide-react';
+import { ArrowLeftRight, PlusCircle, Repeat2, LogOut, LayoutDashboard, Wallet } from 'lucide-react';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -48,6 +48,10 @@ export default function Navbar() {
         <Link to="/swaps" className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isActive('/swaps') ? 'bg-primary-50 text-primary-600' : 'text-gray-600 hover:bg-gray-50'}`}>
           <Repeat2 size={16} />
           My Swaps
+        </Link>
+        <Link to="/credits" className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isActive('/credits') ? 'bg-primary-50 text-primary-600' : 'text-gray-600 hover:bg-gray-50'}`}>
+          <Wallet size={16} />
+          ₹{user.timeCredits}
         </Link>
         <Link to="/listings/new" className="btn-primary text-sm flex items-center gap-1.5 ml-2">
           <PlusCircle size={16} />
