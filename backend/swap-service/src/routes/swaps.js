@@ -90,16 +90,22 @@ router.patch('/:id/accept', auth, async (req, res) => {
     swap.status = 'accepted';
     await swap.save();
 
-    await Promise.all([
+    const serviceToken = `Bearer ${require('jsonwebtoken').sign(
+      { id: 'system', name: 'system', role: 'admin' },
+      process.env.JWT_SECRET,
+      { expiresIn: '1m' }
+    )}`;
+
+    Promise.all([
       axios.put(`${process.env.LISTING_SERVICE_URL}/listings/${swap.offeredListingId}`,
         { status: 'in-swap' },
-        { headers: { authorization: req.headers['authorization'] } }
+        { headers: { authorization: serviceToken } }
       ),
       axios.put(`${process.env.LISTING_SERVICE_URL}/listings/${swap.requestedListingId}`,
         { status: 'in-swap' },
-        { headers: { authorization: req.headers['authorization'] } }
+        { headers: { authorization: serviceToken } }
       )
-    ]);
+    ]).catch(() => {});
 
     res.json(swap);
   } catch (err) {
@@ -130,20 +136,26 @@ router.patch('/:id/cancel', auth, async (req, res) => {
     if (!['pending', 'accepted'].includes(swap.status))
       return res.status(400).json({ message: 'Cannot cancel at this stage' });
 
+    const wasAccepted = swap.status === 'accepted';
     swap.status = 'cancelled';
     await swap.save();
 
-    if (swap.status === 'accepted') {
-      await Promise.all([
+    if (wasAccepted) {
+      const serviceToken = `Bearer ${require('jsonwebtoken').sign(
+        { id: 'system', name: 'system', role: 'admin' },
+        process.env.JWT_SECRET,
+        { expiresIn: '1m' }
+      )}`;
+      Promise.all([
         axios.put(`${process.env.LISTING_SERVICE_URL}/listings/${swap.offeredListingId}`,
           { status: 'active' },
-          { headers: { authorization: req.headers['authorization'] } }
+          { headers: { authorization: serviceToken } }
         ),
         axios.put(`${process.env.LISTING_SERVICE_URL}/listings/${swap.requestedListingId}`,
           { status: 'active' },
-          { headers: { authorization: req.headers['authorization'] } }
+          { headers: { authorization: serviceToken } }
         )
-      ]);
+      ]).catch(() => {});
     }
 
     res.json(swap);
@@ -164,16 +176,22 @@ router.patch('/:id/complete', auth, async (req, res) => {
     swap.completedAt = new Date();
     await swap.save();
 
-    await Promise.all([
+    const serviceToken = `Bearer ${require('jsonwebtoken').sign(
+      { id: 'system', name: 'system', role: 'admin' },
+      process.env.JWT_SECRET,
+      { expiresIn: '1m' }
+    )}`;
+
+    Promise.all([
       axios.put(`${process.env.LISTING_SERVICE_URL}/listings/${swap.offeredListingId}`,
         { status: 'completed' },
-        { headers: { authorization: req.headers['authorization'] } }
+        { headers: { authorization: serviceToken } }
       ),
       axios.put(`${process.env.LISTING_SERVICE_URL}/listings/${swap.requestedListingId}`,
         { status: 'completed' },
-        { headers: { authorization: req.headers['authorization'] } }
+        { headers: { authorization: serviceToken } }
       )
-    ]);
+    ]).catch(() => {});
 
     res.json(swap);
   } catch (err) {

@@ -12,14 +12,13 @@ export default function Listings() {
   const [search, setSearch] = useState('');
   const [type, setType] = useState('');
   const [category, setCategory] = useState('');
-
-  const fetchListings = async () => {
+  const fetchListings = async (s = search, t = type, c = category) => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (type) params.set('type', type);
-      if (category) params.set('category', category);
-      if (search) params.set('search', search);
+      if (t) params.set('type', t);
+      if (c) params.set('category', c);
+      if (s) params.set('search', s);
       const { data } = await api.get(`/listings?${params}`);
       setListings(data);
     } finally {
@@ -27,11 +26,17 @@ export default function Listings() {
     }
   };
 
-  useEffect(() => { fetchListings(); }, [type, category]);
+  useEffect(() => { fetchListings(search, type, category); }, [type, category]);
+
+  useEffect(() => {
+    if (search.length >= 2 || search === '') {
+      fetchListings(search, type, category);
+    }
+  }, [search]);
 
   const handleSearch = (e) => {
     e.preventDefault();
-    fetchListings();
+    fetchListings(search, type, category);
   };
 
   return (

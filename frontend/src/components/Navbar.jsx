@@ -1,6 +1,6 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { ArrowLeftRight, PlusCircle, Bell, User, LogOut, LayoutDashboard } from 'lucide-react';
+import { ArrowLeftRight, PlusCircle, Repeat2, LogOut, LayoutDashboard } from 'lucide-react';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -8,6 +8,7 @@ export default function Navbar() {
   const location = useLocation();
 
   const handleLogout = () => {
+    if (!window.confirm('Log out of SwapCircle?')) return;
     logout();
     navigate('/');
   };
@@ -45,7 +46,7 @@ export default function Navbar() {
           Browse
         </Link>
         <Link to="/swaps" className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isActive('/swaps') ? 'bg-primary-50 text-primary-600' : 'text-gray-600 hover:bg-gray-50'}`}>
-          <Bell size={16} />
+          <Repeat2 size={16} />
           My Swaps
         </Link>
         <Link to="/listings/new" className="btn-primary text-sm flex items-center gap-1.5 ml-2">
@@ -55,7 +56,8 @@ export default function Navbar() {
         <Link to={`/profile/${user.id}`} className="ml-2 w-9 h-9 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-semibold text-sm hover:bg-primary-200 transition-colors">
           {user.name[0].toUpperCase()}
         </Link>
-        <button onClick={handleLogout} className="ml-1 p-2 text-gray-400 hover:text-gray-700 transition-colors">
+        <div className="w-px h-6 bg-gray-200 mx-2" />
+        <button onClick={handleLogout} className="p-2 text-gray-400 hover:text-red-500 transition-colors" title="Log out">
           <LogOut size={18} />
         </button>
       </div>

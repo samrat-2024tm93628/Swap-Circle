@@ -17,7 +17,15 @@ router.get('/:userId', async (req, res) => {
   try {
     let profile = await Profile.findOne({ userId: req.params.userId });
     if (!profile) {
-      profile = await Profile.create({ userId: req.params.userId });
+      try {
+        profile = await Profile.create({ userId: req.params.userId });
+      } catch (createErr) {
+        if (createErr.code === 11000) {
+          profile = await Profile.findOne({ userId: req.params.userId });
+        } else {
+          throw createErr;
+        }
+      }
     }
     res.json(profile);
   } catch (err) {

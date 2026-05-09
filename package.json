@@ -1,0 +1,15 @@
+{
+  "name": "swapcircle-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "install:all": "npm install --prefix backend/api-gateway && npm install --prefix backend/auth-service && npm install --prefix backend/listing-service && npm install --prefix backend/swap-service && npm install --prefix backend/user-service && npm install --prefix frontend",
+    "start:gateway": "npm run dev --prefix backend/api-gateway",
+    "start:auth": "npm run dev --prefix backend/auth-service",
+    "start:listing": "npm run dev --prefix backend/listing-service",
+    "start:swap": "npm run dev --prefix backend/swap-service",
+    "start:user": "npm run dev --prefix backend/user-service",
+    "start:frontend": "npm run dev --prefix frontend",
+    "dev": "npx concurrently --kill-others \"npm run start:gateway\" \"npm run start:auth\" \"npm run start:listing\" \"npm run start:swap\" \"npm run start:user\" \"npm run start:frontend\""
+  }
+}

@@ -18,13 +18,18 @@ export default function Profile() {
   const isOwn = user.id === userId;
 
   useEffect(() => {
-    Promise.all([
-      api.get(`/users/${userId}`).then(r => {
+    const fetchProfile = api.get(`/users/${userId}`)
+      .then(r => {
         setProfile(r.data);
         setForm({ bio: r.data.bio || '', location: r.data.location || '', skills: (r.data.skills || []).join(', ') });
-      }),
-      api.get(`/listings/user/${userId}`).then(r => setListings(r.data.filter(l => l.status === 'active'))),
-    ]).finally(() => setLoading(false));
+      })
+      .catch(() => {});
+
+    const fetchListings = api.get(`/listings/user/${userId}`)
+      .then(r => setListings(r.data.filter(l => l.status === 'active')))
+      .catch(() => setListings([]));
+
+    Promise.all([fetchProfile, fetchListings]).finally(() => setLoading(false));
   }, [userId]);
 
   const saveProfile = async () => {

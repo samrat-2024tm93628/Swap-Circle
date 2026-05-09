@@ -15,9 +15,9 @@ export default function Dashboard() {
 
   useEffect(() => {
     Promise.all([
-      api.get('/listings?status=active').then(r => setRecentListings(r.data.slice(0, 6))),
-      api.get('/swaps/mine').then(r => setMySwaps(r.data.slice(0, 3))),
-      api.get(`/users/${user.id}`).then(r => setProfile(r.data)),
+      api.get('/listings?status=active').then(r => setRecentListings(r.data.slice(0, 6))).catch(() => {}),
+      api.get('/swaps/mine').then(r => setMySwaps(r.data.slice(0, 3))).catch(() => {}),
+      api.get(`/users/${user.id}`).then(r => setProfile(r.data)).catch(() => {}),
     ]).finally(() => setLoading(false));
   }, [user.id]);
 
